@@ -15,8 +15,8 @@ jobs:
   #     artifacts_retention_days: 0
 
   run-tests:
-    if: github.event.pull_request.draft == false && success()
-    needs: build-standalone-artifacts
+    #if: github.event.pull_request.draft == false && success()
+    #needs: build-standalone-artifacts
     uses: ./.github/workflows/ci-matrix-gen.yml
     with:
-      jobs_to_run: 
+      jobs_to_run: ^(?=.*linux-aarch64).*$ # tmp

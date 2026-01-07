@@ -84,13 +84,22 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          Write-Host "MAVEN_HOME=$env:MAVEN_HOME"
+          Write-Host "JAVA_HOME=$env:JAVA_HOME"
+          Write-Host "PATH=$env:PATH"
           $matrix_env = '${{ toJson(matrix.env) }}'
           $envs = $matrix_env | ConvertFrom-Json
+          
+          $envs.PSObject.Properties | ForEach-Object { Write-Host "$($_.Name) = $($_.Value)" }
           foreach ($pair in $envs.PSObject.Properties) {
-            $full_value = $pair.Value -replace '%([A-Za-z0-9_]+)%', '$env:$1'
+            Write-Host "[DEBUG] $($pair.Name) VALUE PRE-REPLACE: $($pair.Value)"
+            $full_value = $pair.Value -replace '\$([A-Za-z0-9_]+)', '$env:$1'
+            Write-Host "[DEBUG] $($pair.Name) VALUE REPLACED : $full_value"
             $value = $ExecutionContext.InvokeCommand.ExpandString($full_value)
+            Write-Host "[DEBUG] $($pair.Name) VALUE EXPANDED: $value"
             "$($pair.Name)=$value" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           }
+          Write-Host "[DEBUG] FINAL env:PATH: $env:PATH"
 
       - name: Actions/Checkout
         uses: actions/checkout@v4
@@ -241,6 +250,7 @@ jobs:
       - name: Run on Unix
         working-directory: main
         if: ${{ matrix.run_steps && runner.os != 'Windows' }}
+        shell: bash
         run: |
           ${{ matrix.run_steps }}
       - name: Run on Windows

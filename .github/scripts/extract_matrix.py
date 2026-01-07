@@ -46,6 +46,7 @@ OSS = {
 # Override unavailable Python versions for some OS/Arch combinations
 PYTHON_VERSIONS = {
     "ubuntu-24.04-arm": "3.12.8",
+    "ubuntu-latest": "3.12.8",
 }
 
 
