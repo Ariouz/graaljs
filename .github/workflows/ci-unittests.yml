@@ -19,4 +19,4 @@ jobs:
     #needs: build-standalone-artifacts
     uses: ./.github/workflows/ci-matrix-gen.yml
     with:
-      jobs_to_run: ^(?=.*linux-aarch64).*$ # tmp
+      jobs_to_run: (?!.*(aux-engine|smoke|pgo|bench|graalvm|style))
