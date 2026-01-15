@@ -5,18 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-
-  # build-standalone-artifacts:
-  #   if: github.event.pull_request.draft == false
-  #   uses: ./.github/workflows/ci-matrix-gen.yml
-  #   with:
-  #     jobs_to_run: ^(?=.*python-svm-build).*$
-  #     logs_retention_days: 0
-  #     artifacts_retention_days: 0
-
   run-tests:
-    #if: github.event.pull_request.draft == false && success()
-    #needs: build-standalone-artifacts
     uses: ./.github/workflows/ci-matrix-gen.yml
     with:
-      jobs_to_run: (?!.*(aux-engine|smoke|pgo|bench|graalvm|style))
+      jobs_to_run: nodejs-gate-es-module-jdklatest-linux-amd64
