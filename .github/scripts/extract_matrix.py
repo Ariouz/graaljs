@@ -55,7 +55,6 @@ DEFAULT_ENV = {
     "CI": "true",
     "PYTHONIOENCODING": "utf-8",
     "GITHUB_CI": "true",
-    "NODE_POLYGLOT_OPTIONS": "--js.webassembly=true --experimental-options"
 }
 
 # If any of these terms are in the job json, they do not run in public
