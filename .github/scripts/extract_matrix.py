@@ -56,7 +56,8 @@ DEFAULT_ENV = {
     "PYTHONIOENCODING": "utf-8",
     "GITHUB_CI": "true",
     "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm",
-    "NATIVE_IMAGES": "lib:graal-nodejs,lib:jvmcicompiler"
+    "NATIVE_IMAGES": "lib:graal-nodejs,lib:jvmcicompiler",
+    "TOOLS_JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk-amd64"
 }
 
 # If any of these terms are in the job json, they do not run in public
@@ -73,7 +74,8 @@ JOB_EXCLUSION_TERMS = (
 )
 
 DOWNLOADS_LINKS = {
-    "GRADLE_JAVA_HOME": "https://download.oracle.com/java/{major_version}/latest/jdk-{major_version}_{os}-{arch_short}_bin{ext}"
+    "GRADLE_JAVA_HOME": "https://download.oracle.com/java/{major_version}/latest/jdk-{major_version}_{os}-{arch_short}_bin{ext}",
+        "ECLIPSE": "https://www.eclipse.org/downloads/download.php?file=/eclipse/downloads/drops4/R-4.26-202211231800/eclipse-SDK-4.26-linux-gtk-x86_64.tar.gz"
 }
 
 # Gitlab Runners OSS
@@ -88,7 +90,8 @@ OSS = {
 PYTHON_VERSIONS = {
     "ubuntu-24.04-arm": "3.12.8",
     "ubuntu-latest": "3.12.8",
-    "style-gate": "3.8.12"
+    "style-gate": "3.8.12",
+    "js-gate-style": "3.8.12",
 }
 
 EXCLUDED_SYSTEM_PACKAGES = {
@@ -198,7 +201,7 @@ class Job:
                 Add-Content $env:GITHUB_ENV "{key}=$(Resolve-Path $dirname)"
             """)
 
-        return (f"wget -q {download_link} && "
+        return (f"wget -q '{download_link}' -O {filename} && "
             f"dirname=$(tar -tzf {filename} | head -1 | cut -f1 -d '/') && "
             f"tar -xzf {filename} && "
             f'echo {key}=$(realpath "$dirname") >> $GITHUB_ENV')
@@ -213,7 +216,7 @@ class Job:
 
         vars = {
             "major_version": major_version,
-            "os":os, 
+            "os": os, 
             "arch": arch, 
             "arch_short": arch_short,
             "ext": extension,
@@ -290,8 +293,7 @@ class Job:
             if isinstance(s, list):
                 flattened_args.append(f"$( {shlex.join(s)} )")
             else:
-                pattern = re.compile(r"\$\{([A-Z0-9_]+)\}")
-                out = pattern.sub(r"$\1", s).replace("'", "")
+                out = re.sub(r"\$\{([A-Z0-9_]+)\}", r"$\1", s).replace("'", "")
                 flattened_args.append(out)
         return flattened_args
 
@@ -318,6 +320,7 @@ class Job:
             "name": self.name,
             "mx_version": self.mx_version,
             "os": self.runs_on,
+            "fetch_depth": 0 if "style" in self.env.get("TAGS", "") else 1,
             "python_version": self.python_version,
             "setup_steps": self.setup,
             "run_steps": self.run,
@@ -327,7 +330,7 @@ class Job:
             "require_artifact": [self.download_artifact.name, self.download_artifact.pattern] if self.download_artifact else None,
             "logs": self.logs.replace("../", "${{ env.PARENT_DIRECTORY }}/"),
             "env": self.env,
-            "downloads_steps": " ".join(self.downloads),
+            "downloads_steps": "\n".join(self.downloads),
         }
 
     def __str__(self):
@@ -357,9 +360,10 @@ def get_tagged_jobs(buildspec, target, filter=None):
     jobs = [Job({"name": target}).to_dict()]
     for job in sorted([Job(build) for build in buildspec.get("builds", [])]):
         if not any(t for t in job.targets if t in [target]):
-            if "weekly" in job.targets and target == "tier1": pass
-            else: 
-                continue
+            continue
+            # if "weekly" in job.targets and target == "tier1": pass
+            # else: 
+                # continue
         if filter and not re.match(filter, job.name):
             continue
         if [x for x in JOB_EXCLUSION_TERMS if x in str(job)]:

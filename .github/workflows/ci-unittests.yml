@@ -8,4 +8,4 @@ jobs:
   run-tests:
     uses: ./.github/workflows/ci-matrix-gen.yml
     with:
-      jobs_to_run: nodejs-gate-es-module-jdklatest-linux-amd64
+      jobs_to_run: 
