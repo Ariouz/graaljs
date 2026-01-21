@@ -57,20 +57,21 @@ DEFAULT_ENV = {
     "GITHUB_CI": "true",
     "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm",
     "NATIVE_IMAGES": "lib:graal-nodejs,lib:jvmcicompiler",
-    "TOOLS_JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk-amd64" # tmp
+    "TOOLS_JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk-amd64"
 }
 
 # If any of these terms are in the job json, they do not run in public
 # infrastructure
 JOB_EXCLUSION_TERMS = (
     "enterprise",
+    "ee",
     "corporate-compliance",
 
-    # Jobs failing in GitHub Actions:buffer overflow, out of memory
-    "python-svm-unittest",
-    "cpython-gate",
-
-    "darwin",
+    # Jobs failing in GitHub Actions
+    "nodejs-gate-style", # no space left on device
+    "nodejs-gate-default", # memory/cpu limits
+    "nodejs-gate-graalvm-ce-jdklatest-linux-amd64", # curio.ssw.jku.at 502 error
+    "darwin" # out of memory
 )
 
 DOWNLOADS_LINKS = {
@@ -277,13 +278,32 @@ class Job:
         return None
     
     @staticmethod
-    def safe_join(args: list[str]) -> str:
+    def contains_shell_var(s: str) -> bool:
+        return bool(re.search(r"\$[a-zA-Z_][a-zA-Z0-9_]*", s))
+    
+    import shlex
+
+    def safe_join(self, args: list[str]) -> str:
         safe_args = []
         for s in args:
-            if s.startswith("$(") and s.endswith(")"):
+            if s.startswith("$(") and s.endswith(")") or Job.contains_shell_var(s):
                 safe_args.append(s)
+                continue
+
+            if self.runs_on == "windows-latest":
+                if s.startswith('-'):
+                    safe_args.append(s)
+                else:
+                    safe_args.append(shlex.quote(s))
+                continue
+
+            if "'" not in s:
+                safe_args.append(f"'{s}'")
+            elif '"' not in s:
+                safe_args.append(f'"{s}"')
             else:
                 safe_args.append(shlex.quote(s))
+
         return " ".join(safe_args)
 
     @staticmethod
@@ -291,10 +311,12 @@ class Job:
         flattened_args = []
         for s in args:
             if isinstance(s, list):
-                flattened_args.append(f"$( {shlex.join(s)} )")
+                flattened_args.append(f" $({shlex.join(s)}) ")
             else:
-                out = re.sub(r"\$\{([A-Z0-9_]+)\}", r"$\1", s).replace("'", "")
+                out = re.sub(r"\$\{([A-Z0-9_]+)\}", r"$\1", s)
                 flattened_args.append(out)
+
+        if flattened_args[0] == "set-export": flattened_args.insert(0, "source")
         return flattened_args
 
     @cached_property
@@ -304,8 +326,11 @@ class Job:
 
     @cached_property
     def run(self) -> str:
-        cmds = [self.flatten_command(step) for step in self.job.get("run", [])]
-        return "\n".join(' '.join(s) for s in cmds)
+        cmds = []
+        for step in self.job.get("run", []):
+            safe = self.safe_join(self.flatten_command(step))
+            cmds.append(safe)
+        return ("\n" if self.runs_on != "windows-latest" else " && ").join(s for s in cmds)
 
     @cached_property
     def logs(self) -> str:
