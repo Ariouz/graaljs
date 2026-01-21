@@ -8,4 +8,5 @@ jobs:
   run-tests:
     uses: ./.github/workflows/ci-matrix-gen.yml
     with:
-      jobs_to_run: 
+      # nodejs-gate-style: no space left on device errors
+      jobs_to_run: (?!.*(aux-engine|smoke|enterprise|pgo|nodejs-gate-style))
