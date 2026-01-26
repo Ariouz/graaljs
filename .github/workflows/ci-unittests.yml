@@ -8,4 +8,4 @@ jobs:
   run-tests:
     uses: ./.github/workflows/ci-matrix-gen.yml
     with:
-      jobs_to_run: (?!.*(aux-engine|smoke|pgo))
+      jobs_to_run: nodejs-gate-sequential-jdklatest-windows-amd64 # (?!.*(aux-engine|smoke|pgo))

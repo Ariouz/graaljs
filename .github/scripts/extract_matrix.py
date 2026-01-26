@@ -55,7 +55,7 @@ DEFAULT_ENV = {
     "CI": "true",
     "PYTHONIOENCODING": "utf-8",
     "GITHUB_CI": "true",
-    "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm",
+    "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm,/sdk",
     "NATIVE_IMAGES": "lib:graal-nodejs,lib:jvmcicompiler",
     "TOOLS_JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk-amd64"
 }
@@ -323,13 +323,29 @@ class Job:
         cmds = [self.flatten_command(step) for step in self.job.get("setup", [])]
         return "\n".join(self.safe_join(s) for s in cmds)
 
+
+    @staticmethod
+    def _to_windows_env_format(s: str) -> str:
+        s = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", r"%\1%", s)
+        s = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)", r"%\1%", s)
+        return s
+
+    def _fix_windows_command(self, line: str) -> str:
+        line = line.replace("[ $ARTIFACT_NAME ] || ", "")
+        line = line.replace("source", "")
+        line = self._to_windows_env_format(line)
+        res = [f"'{arg}'" if '=' in arg else arg for arg in line.split()]
+        return " ".join(res)
+
     @cached_property
     def run(self) -> str:
         cmds = []
         for step in self.job.get("run", []):
             safe = self.safe_join(self.flatten_command(step))
+            if self.runs_on == "windows-latest":
+                safe = self._fix_windows_command(safe)
             cmds.append(safe)
-        return ("\n" if self.runs_on != "windows-latest" else " && ").join(s for s in cmds)
+        return ("\n" if self.runs_on != "windows-latest" else " && ").join(cmds)
 
     @cached_property
     def logs(self) -> str:
