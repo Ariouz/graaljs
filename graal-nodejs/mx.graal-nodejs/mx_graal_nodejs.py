@@ -373,8 +373,6 @@ def testnode(args, nonZeroIsFatal=True, out=None, err=None, cwd=None):
     _setEnvVar('NODE_JVM_OPTIONS', ' '.join(['-ea', '-Xrs'] + extraArgs + vmArgs))
     _setEnvVar('NODE_STACK_SIZE', '4000000')
     _setEnvVar('NODE_INTERNAL_ERROR_CHECK', 'true')
-    print("Run command : python3 tools/test.py " + ' '.join(progArgs))
-    print("Node options: " + os.environ['NODE_JVM_OPTIONS'])
     return mx.run(['python3', join('tools', 'test.py')] + progArgs, nonZeroIsFatal=nonZeroIsFatal, out=out, err=err, cwd=(_suite.dir if cwd is None else cwd))
 
 def setLibraryPath():

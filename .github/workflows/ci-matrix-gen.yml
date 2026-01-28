@@ -270,9 +270,6 @@ jobs:
           GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
         run: |
           call "%GYP_MSVS_OVERRIDE_PATH%\VC\Auxiliary\Build\vcvarsall.bat" x64
-          @echo on
-          where dumpbin
-          dir "%JAVA_HOME%\lib\static\windows-amd64"
           ${{ matrix.run_steps }}
 
       - name: Tar artifacts

@@ -280,8 +280,6 @@ class Job:
     def contains_shell_var(s: str) -> bool:
         return bool(re.search(r"\$[a-zA-Z_][a-zA-Z0-9_]*", s))
     
-    import shlex
-
     def safe_join(self, args: list[str]) -> str:
         safe_args = []
         for s in args:
@@ -312,6 +310,7 @@ class Job:
             if isinstance(s, list):
                 flattened_args.append(f" $({shlex.join(s)}) ")
             else:
+                # replace ${VAR} with $VAR
                 out = re.sub(r"\$\{([A-Z0-9_]+)\}", r"$\1", s)
                 flattened_args.append(out)
 
@@ -325,16 +324,18 @@ class Job:
 
 
     @staticmethod
-    def _to_windows_env_format(s: str) -> str:
+    def to_windows_env_format(s: str) -> str:
+        # replace ${VAR} and $VAR with %VAR%
         s = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", r"%\1%", s)
         s = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)", r"%\1%", s)
         return s
 
-    def _fix_windows_command(self, line: str) -> str:
+    @staticmethod
+    def fix_windows_command(line: str) -> str:
         win_replacements = ["[ $ARTIFACT_NAME ] || ", "source"]
         for rep in win_replacements:
             line = line.replace(rep, "")
-        line = self._to_windows_env_format(line)
+        line = Job.to_windows_env_format(line)
         return " ".join(line.split())
 
     @cached_property
@@ -343,7 +344,7 @@ class Job:
         for step in self.job.get("run", []):
             safe = self.safe_join(self.flatten_command(step))
             if self.runs_on == "windows-latest":
-                safe = self._fix_windows_command(safe)
+                safe = self.fix_windows_command(safe)
             cmds.append(safe)
         return ("\n" if self.runs_on != "windows-latest" else " && ").join(cmds)
 
@@ -401,9 +402,6 @@ def get_tagged_jobs(buildspec, target, filter=None):
     for job in sorted([Job(build) for build in buildspec.get("builds", [])]):
         if not any(t for t in job.targets if t in [target]):
             continue
-            # if "weekly" in job.targets and target == "tier1": pass
-            # else: 
-                # continue
         if filter and not re.match(filter, job.name):
             continue
         if [x for x in JOB_EXCLUSION_TERMS if x in str(job)]:
