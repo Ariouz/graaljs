@@ -331,11 +331,11 @@ class Job:
         return s
 
     def _fix_windows_command(self, line: str) -> str:
-        line = line.replace("[ $ARTIFACT_NAME ] || ", "")
-        line = line.replace("source", "")
+        win_replacements = ["[ $ARTIFACT_NAME ] || ", "source"]
+        for rep in win_replacements:
+            line = line.replace(rep, "")
         line = self._to_windows_env_format(line)
-        res = [f"'{arg}'" if '=' in arg else arg for arg in line.split()]
-        return " ".join(res)
+        return " ".join(line.split())
 
     @cached_property
     def run(self) -> str:

@@ -266,10 +266,10 @@ jobs:
         if: ${{ matrix.run_steps && runner.os == 'Windows' }}
         shell: cmd
         env:
-          VSINSTALLDIR: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
-          VCINSTALLDIR: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC'
+          GYP_MSVS_VERSION: '2022'
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
         run: |
-          call "%VCINSTALLDIR%\Auxiliary\Build\vcvarsall.bat" x64
+          call "%GYP_MSVS_OVERRIDE_PATH%\VC\Auxiliary\Build\vcvarsall.bat" x64
           @echo on
           where dumpbin
           dir "%JAVA_HOME%\lib\static\windows-amd64"
