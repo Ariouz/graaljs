@@ -55,7 +55,7 @@ DEFAULT_ENV = {
     "CI": "true",
     "PYTHONIOENCODING": "utf-8",
     "GITHUB_CI": "true",
-    "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm,/sdk",
+    "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm",
     "NATIVE_IMAGES": "lib:graal-nodejs,lib:jvmcicompiler",
     "TOOLS_JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk-amd64"
 }
