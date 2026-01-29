@@ -68,9 +68,9 @@ JOB_EXCLUSION_TERMS = (
     "corporate-compliance",
 
     # Jobs failing in GitHub Actions
-    "nodejs-gate-style", # no space left on device
-    "nodejs-gate-default", # memory/cpu limits
-    "nodejs-gate-graalvm-ce-jdklatest-linux-amd64", # curio.ssw.jku.at 502 error
+    #"nodejs-gate-style", # no space left on device
+    #"nodejs-gate-default", # memory/cpu limits
+    #"nodejs-gate-graalvm-ce-jdklatest-linux-amd64", # curio.ssw.jku.at 502 error
     "darwin" # out of memory
 )
 
@@ -103,6 +103,10 @@ EXCLUDED_SYSTEM_PACKAGES = {
 PYTHON_PACKAGES_VERSIONS = {
     "pylint": "==2.4",
     "astroid": "==2.4"
+}
+
+EXCLUDED_COMMANDS_TERMS = {
+    "curio.ssw.jku.at"
 }
 
 @dataclass
@@ -317,12 +321,6 @@ class Job:
         if flattened_args[0] == "set-export": flattened_args.insert(0, "source")
         return flattened_args
 
-    @cached_property
-    def setup(self) -> str:
-        cmds = [self.flatten_command(step) for step in self.job.get("setup", [])]
-        return "\n".join(self.safe_join(s) for s in cmds)
-
-
     @staticmethod
     def to_windows_env_format(s: str) -> str:
         # replace ${VAR} and $VAR with %VAR%
@@ -338,6 +336,17 @@ class Job:
         line = Job.to_windows_env_format(line)
         return " ".join(line.split())
 
+    @staticmethod
+    def should_exclude_command(cmd):
+        for term in EXCLUDED_COMMANDS_TERMS:
+            if term in cmd: return True
+        return False
+
+    @cached_property
+    def setup(self) -> str:
+        cmds = [self.flatten_command(step) for step in self.job.get("setup", [])]
+        return "\n".join(self.safe_join(s) for s in cmds)
+
     @cached_property
     def run(self) -> str:
         cmds = []
@@ -345,6 +354,8 @@ class Job:
             safe = self.safe_join(self.flatten_command(step))
             if self.runs_on == "windows-latest":
                 safe = self.fix_windows_command(safe)
+                
+            if self.should_exclude_command(safe): continue
             cmds.append(safe)
         return ("\n" if self.runs_on != "windows-latest" else " && ").join(cmds)
 
