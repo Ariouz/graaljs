@@ -137,6 +137,11 @@ jobs:
             pip install "$pkg"
           }
 
+      - name: Remove default Node.js
+        if: ${{ runner.os != 'Windows'}}
+        run: |
+          sudo rm -f $(which node) $(which npm) 2>/dev/null || true
+
       - name: Install system packages on Linux
         if: ${{ runner.os == 'Linux' && matrix.system_packages }}
         run: |
@@ -260,6 +265,7 @@ jobs:
         if: ${{ matrix.run_steps && runner.os != 'Windows' }}
         shell: bash
         run: |
+          set -x
           ${{ matrix.run_steps }}
       - name: Run on Windows
         working-directory: main
@@ -270,6 +276,7 @@ jobs:
           GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
         run: |
           call "%GYP_MSVS_OVERRIDE_PATH%\VC\Auxiliary\Build\vcvarsall.bat" x64
+          @echo on
           ${{ matrix.run_steps }}
 
       - name: Tar artifacts

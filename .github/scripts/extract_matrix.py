@@ -55,8 +55,6 @@ DEFAULT_ENV = {
     "CI": "true",
     "PYTHONIOENCODING": "utf-8",
     "GITHUB_CI": "true",
-    "DYNAMIC_IMPORTS": "/substratevm,/tools,/wasm",
-    "NATIVE_IMAGES": "lib:graal-nodejs,lib:jvmcicompiler",
     "TOOLS_JAVA_HOME": "/usr/lib/jvm/temurin-21-jdk-amd64"
 }
 
@@ -68,9 +66,7 @@ JOB_EXCLUSION_TERMS = (
     "corporate-compliance",
 
     # Jobs failing in GitHub Actions
-    "nodejs-gate-style", # no space left on device
-    "nodejs-gate-default", # memory/cpu limits
-    "nodejs-gate-graalvm-ce-jdklatest-linux-amd64", # curio.ssw.jku.at 502 error
+    "nodejs-gate-default-jdklatest-linux", # out of memory
     "darwin" # out of memory
 )
 
@@ -105,6 +101,10 @@ PYTHON_PACKAGES_VERSIONS = {
     "astroid": "==2.4"
 }
 
+EXCLUDED_COMMANDS_TERMS = {
+    "curio.ssw.jku.at",
+}
+
 @dataclass
 class Artifact:
     name: str
@@ -135,7 +135,13 @@ class Job:
 
     @cached_property
     def env(self) -> dict[str, str]:
-        return self.job.get("environment", {}) | DEFAULT_ENV
+        env = self.job.get("environment", {}) | DEFAULT_ENV
+        exports = ["DYNAMIC_IMPORTS", "NATIVE_IMAGES"]
+        for key in self.job.get("run", []):
+            if isinstance(key, list) and "set-export" in key[0]:
+                if key[1] in exports:
+                    env[key[1]] = key[2]
+        return env
 
     @cached_property
     def mx_version(self) -> str | None:
@@ -317,26 +323,57 @@ class Job:
         if flattened_args[0] == "set-export": flattened_args.insert(0, "source")
         return flattened_args
 
+    @staticmethod
+    def to_windows_env_format(s: str) -> str:
+        # replace ${VAR} and $VAR with %VAR%
+        s = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", r"%%\1%%", s)
+        s = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)", r"%%\1%%", s)
+        return s
+
+    @staticmethod
+    def replace_win_commands(line: str) -> str:
+        jvm_bash = "call set-export STANDALONE_HOME ' $(mx --quiet --no-warning paths --output GRAALNODEJS_JVM_STANDALONE) '"
+        native_bash = "call set-export STANDALONE_HOME ' $(mx --quiet --no-warning paths --output GRAALNODEJS_NATIVE_STANDALONE) '"
+        jvm_cmd = 'for /f "delims=" %%i in (\'mx --quiet --no-warning paths --output GRAALNODEJS_JVM_STANDALONE\') do set "STANDALONE_HOME=%%i"'
+        native_cmd = 'for /f "delims=" %%i in (\'mx --quiet --no-warning paths --output GRAALNODEJS_NATIVE_STANDALONE\') do set "STANDALONE_HOME=%%i"'
+
+        if jvm_bash in line:
+            line = line.replace(jvm_bash, jvm_cmd)
+        if native_bash in line:
+            line = line.replace(native_bash, native_cmd)
+        return line
+
+    @staticmethod
+    def fix_windows_command(line: str) -> str:
+        excluded_exports = ("DYNAMIC_IMPORTS", "NATIVE_IMAGES", "VERBOSE_GRAALVM_LAUNCHERS")
+        if ("set-export" in line or "unset" in line) and any(val in line for val in excluded_exports):
+            return ""
+        
+        win_replacements = ["[ $ARTIFACT_NAME ] || ", "source"]
+        for rep in win_replacements:
+            line = line.replace(rep, "")
+
+        line = Job.to_windows_env_format(line)
+        line = line.replace("set-export", "call set-export")
+        line = line.replace("%%TAGS%%", "%TAGS%")
+        line = line.replace("%%STANDALONE_HOME%%/bin/node", "call %%STANDALONE_HOME%%\\bin\\node")
+        line = line.replace("%%STANDALONE_HOME%%/bin/npm", "call %%STANDALONE_HOME%%\\bin\\npm")
+        line = line.replace("-e 'console.log('\"'\"'Hello, World!'\"'\"')'", '-e "console.log(\'Hello, World!\')"')
+
+        line = Job.replace_win_commands(line)
+        line = f"echo === Running: {line} === && {line}"
+        return line
+
+    @staticmethod
+    def should_exclude_command(cmd):
+        for term in EXCLUDED_COMMANDS_TERMS:
+            if term in cmd: return True
+        return False
+
     @cached_property
     def setup(self) -> str:
         cmds = [self.flatten_command(step) for step in self.job.get("setup", [])]
         return "\n".join(self.safe_join(s) for s in cmds)
-
-
-    @staticmethod
-    def to_windows_env_format(s: str) -> str:
-        # replace ${VAR} and $VAR with %VAR%
-        s = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", r"%\1%", s)
-        s = re.sub(r"\$([A-Za-z_][A-Za-z0-9_]*)", r"%\1%", s)
-        return s
-
-    @staticmethod
-    def fix_windows_command(line: str) -> str:
-        win_replacements = ["[ $ARTIFACT_NAME ] || ", "source"]
-        for rep in win_replacements:
-            line = line.replace(rep, "")
-        line = Job.to_windows_env_format(line)
-        return " ".join(line.split())
 
     @cached_property
     def run(self) -> str:
@@ -345,6 +382,9 @@ class Job:
             safe = self.safe_join(self.flatten_command(step))
             if self.runs_on == "windows-latest":
                 safe = self.fix_windows_command(safe)
+                
+            if self.should_exclude_command(safe): continue
+            if len(safe.strip()) == 0: continue
             cmds.append(safe)
         return ("\n" if self.runs_on != "windows-latest" else " && ").join(cmds)
 
