@@ -1,0 +1,11 @@
+name: Run CI unittests
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+  workflow_dispatch:
+
+jobs:
+  run-tests:
+    uses: ./.github/workflows/ci-matrix-gen.yml
+    with:
+      jobs_to_run: (?!.*(aux-engine|smoke|pgo))

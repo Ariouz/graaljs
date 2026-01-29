@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+VAR_NAME="$1"
+ARTIFACT_PATH="$2"
+REAL_PATH=$(eval echo $ARTIFACT_PATH)
+
+if [ -d "$REAL_PATH" ]; then
+    export $VAR_NAME="$REAL_PATH"
+    printf "Exported %s=%s\n" "$VAR_NAME" "$REAL_PATH"
+    if [ -n "$GITHUB_OUTPUT" ]; then
+        echo "$VAR_NAME=$REAL_PATH" >> $GITHUB_OUTPUT
+    fi
+fi
